@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Interface for HostHooks
-interface IHostHooks is IHooks {
+interface IHostHooks {
     /// @notice Attaches msg.sender as a symbiont to specified functions of the pool
     function attach(PoolKey calldata key, bytes4[] calldata selectors) external;
 

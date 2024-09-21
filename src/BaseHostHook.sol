@@ -9,19 +9,15 @@ import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice abstract contract for hook implementations
-abstract contract BaseHook is IHooks {
+abstract contract BaseHostHook is IHooks {
     error HookNotImplemented();
 
     IPoolManager internal immutable s_poolManager;
 
-    constructor(IPoolManager poolManager, bool validateHookPermissions) {
+    constructor(IPoolManager poolManager, Hooks.Permissions memory permissons) {
         s_poolManager = poolManager;
-        if (validateHookPermissions) {
-            Hooks.validateHookPermissions(this, getHookPermissions());
-        }
+        Hooks.validateHookPermissions(this, permissons);
     }
-
-    function getHookPermissions() public pure virtual returns (Hooks.Permissions memory) {}
 
     /// @inheritdoc IHooks
     function beforeInitialize(address, PoolKey calldata, uint160, bytes calldata) external virtual returns (bytes4) {

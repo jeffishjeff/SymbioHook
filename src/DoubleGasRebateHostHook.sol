@@ -2,6 +2,7 @@
 pragma solidity =0.8.27;
 
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {IHostHooks} from "./interfaces/IHostHooks.sol";
@@ -10,28 +11,22 @@ import {BalanceDelta, BalanceDeltaLibrary} from "v4-core/types/BalanceDelta.sol"
 import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Receptor, ReceptorLibrary} from "./types/Receptor.sol";
-import {BaseHook} from "./BaseHook.sol";
+import {BaseHostHook} from "./BaseHostHook.sol";
 
-contract HostHook is IHostHooks, BaseHook {
+contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
     uint256 private constant GAS_LIMIT_BPS = 100; // gas limit per symbiont call, 1% of block gas limit
-    uint256 private constant GAS_REBATE_MULTIPLIER_BPS = 15_000; // gas rebate = 150% of gas consumed in a symbiont call
+    uint256 private constant GAS_REBATE_MULTIPLIER_BPS = 20_000; // gas rebate = 200% of gas consumed in a symbiont call
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
     mapping(Receptor => ISymbiontHooks[]) private s_receptorSymbionts; // list of symbionts attached to a receptor
     mapping(ISymbiontHooks => uint256) private s_symbiontBalances; // gas balance of a symbiont
 
-    constructor(IPoolManager poolManager) BaseHook(poolManager, true) {}
-
-    // function getHookPermissions() public pure virtual returns (Hooks.Permissions memory) {}
-    //     return IPoolManager.HookPermissions({
-    //         beforeAddLiquidity: IPoolManager.HookPermission.REQUIRED,
-    //         afterAddLiquidity: IPoolManager.HookPermission.REQUIRED,
-    //         beforeRemoveLiquidity: IPoolManager.HookPermission.REQUIRED,
-    //         afterRemoveLiquidity: IPoolManager.HookPermission.REQUIRED,
-    //         afterSwap: IPoolManager.HookPermission.REQUIRED,
-    //         afterDonate: IPoolManager.HookPermission.REQUIRED
-    //     });
-    // }
+    constructor(IPoolManager poolManager)
+        BaseHostHook(
+            poolManager,
+            Hooks.Permissions(false, false, true, true, true, true, false, true, false, true, false, false, false, false)
+        )
+    {}
 
     /// @inheritdoc IHostHooks
     function attach(PoolKey calldata key, bytes4[] calldata selectors) external {
@@ -58,7 +53,7 @@ contract HostHook is IHostHooks, BaseHook {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external override(IHooks, BaseHook) returns (bytes4) {
+    ) external override returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.beforeAddLiquidity.selector),
             abi.encodeCall(IHooks.beforeAddLiquidity, (sender, key, params, hookData)),
@@ -76,7 +71,7 @@ contract HostHook is IHostHooks, BaseHook {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external override(IHooks, BaseHook) returns (bytes4, BalanceDelta) {
+    ) external override returns (bytes4, BalanceDelta) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterAddLiquidity.selector),
             abi.encodeCall(IHooks.afterAddLiquidity, (sender, key, params, delta, feesAccrued, hookData)),
@@ -93,7 +88,7 @@ contract HostHook is IHostHooks, BaseHook {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external override(IHooks, BaseHook) returns (bytes4) {
+    ) external override returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.beforeRemoveLiquidity.selector),
             abi.encodeCall(IHooks.beforeRemoveLiquidity, (sender, key, params, hookData)),
@@ -111,7 +106,7 @@ contract HostHook is IHostHooks, BaseHook {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external override(IHooks, BaseHook) returns (bytes4, BalanceDelta) {
+    ) external override returns (bytes4, BalanceDelta) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterRemoveLiquidity.selector),
             abi.encodeCall(IHooks.afterRemoveLiquidity, (sender, key, params, delta, feesAccrued, hookData)),
@@ -129,7 +124,7 @@ contract HostHook is IHostHooks, BaseHook {
         IPoolManager.SwapParams calldata params,
         BalanceDelta delta,
         bytes calldata hookData
-    ) external override(IHooks, BaseHook) returns (bytes4, int128) {
+    ) external override returns (bytes4, int128) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterSwap.selector),
             abi.encodeCall(IHooks.afterSwap, (sender, key, params, delta, hookData)),
@@ -147,7 +142,7 @@ contract HostHook is IHostHooks, BaseHook {
         uint256 amount0,
         uint256 amount1,
         bytes calldata hookData
-    ) external override(IHooks, BaseHook) returns (bytes4) {
+    ) external override returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterDonate.selector),
             abi.encodeCall(IHooks.afterDonate, (sender, key, amount0, amount1, hookData)),
