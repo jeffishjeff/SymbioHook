@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-interface ISymbiontHooks {}
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
+
+interface ISymbiontHooks is IHooks {}
