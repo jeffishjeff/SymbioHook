@@ -7,10 +7,23 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
+import {IHostHooks} from "./interfaces/IHostHooks.sol";
 
 /// @notice abstract contract for hook implementations
 abstract contract BaseSymbiontHook is IHooks {
+    error AccessDenied();
     error HookNotImplemented();
+
+    IHostHooks internal immutable s_host;
+
+    modifier onlyHost() {
+        require(msg.sender == address(s_host), AccessDenied());
+        _;
+    }
+
+    constructor(IHostHooks host) {
+        s_host = host;
+    }
 
     /// @inheritdoc IHooks
     function beforeInitialize(address, PoolKey calldata, uint160, bytes calldata) external virtual returns (bytes4) {

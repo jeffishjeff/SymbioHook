@@ -10,9 +10,15 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice abstract contract for hook implementations
 abstract contract BaseHostHook is IHooks {
+    error AccessDenied();
     error HookNotImplemented();
 
     IPoolManager internal immutable s_poolManager;
+
+    modifier onlyPoolManager() {
+        require(msg.sender == address(s_poolManager), AccessDenied());
+        _;
+    }
 
     constructor(IPoolManager poolManager, Hooks.Permissions memory permissons) {
         s_poolManager = poolManager;

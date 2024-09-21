@@ -67,7 +67,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external override returns (bytes4) {
+    ) external override onlyPoolManager returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.beforeAddLiquidity.selector),
             abi.encodeCall(IHooks.beforeAddLiquidity, (sender, key, params, hookData)),
@@ -85,7 +85,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external override returns (bytes4, BalanceDelta) {
+    ) external override onlyPoolManager returns (bytes4, BalanceDelta) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterAddLiquidity.selector),
             abi.encodeCall(IHooks.afterAddLiquidity, (sender, key, params, delta, feesAccrued, hookData)),
@@ -102,7 +102,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external override returns (bytes4) {
+    ) external override onlyPoolManager returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.beforeRemoveLiquidity.selector),
             abi.encodeCall(IHooks.beforeRemoveLiquidity, (sender, key, params, hookData)),
@@ -120,7 +120,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external override returns (bytes4, BalanceDelta) {
+    ) external override onlyPoolManager returns (bytes4, BalanceDelta) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterRemoveLiquidity.selector),
             abi.encodeCall(IHooks.afterRemoveLiquidity, (sender, key, params, delta, feesAccrued, hookData)),
@@ -138,7 +138,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         IPoolManager.SwapParams calldata params,
         BalanceDelta delta,
         bytes calldata hookData
-    ) external override returns (bytes4, int128) {
+    ) external override onlyPoolManager returns (bytes4, int128) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterSwap.selector),
             abi.encodeCall(IHooks.afterSwap, (sender, key, params, delta, hookData)),
@@ -156,7 +156,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         uint256 amount0,
         uint256 amount1,
         bytes calldata hookData
-    ) external override returns (bytes4) {
+    ) external override onlyPoolManager returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterDonate.selector),
             abi.encodeCall(IHooks.afterDonate, (sender, key, amount0, amount1, hookData)),

@@ -13,12 +13,9 @@ import {BaseSymbiontHook} from "./BaseSymbiontHook.sol";
 contract DampenedOracleSymbiontHook is BaseSymbiontHook {
     using StateLibrary for IPoolManager;
 
-    error AccessDenied();
-
     uint256 private constant ADJUSTMENT_LIMIT_BPS = 100; // adjust the oracle price by at most 1% per symbiont call
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
-    IHostHooks private immutable s_host;
     address private immutable s_owner;
     mapping(PoolId => uint256) private s_sqrtPricesX96;
 
@@ -27,13 +24,7 @@ contract DampenedOracleSymbiontHook is BaseSymbiontHook {
         _;
     }
 
-    modifier onlyHost() {
-        require(msg.sender == address(s_host), AccessDenied());
-        _;
-    }
-
-    constructor(IHostHooks host) {
-        s_host = host;
+    constructor(IHostHooks host) BaseSymbiontHook(host) {
         s_owner = msg.sender;
     }
 
@@ -71,6 +62,7 @@ contract DampenedOracleSymbiontHook is BaseSymbiontHook {
     function afterSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata, BalanceDelta, bytes calldata)
         external
         override
+        onlyHost
         returns (bytes4, int128)
     {
         PoolId poolId = key.toId();
