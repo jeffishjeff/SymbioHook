@@ -6,7 +6,6 @@ import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {IHostHooks} from "./interfaces/IHostHooks.sol";
-import {ISymbiontHooks} from "./interfaces/ISymbiontHooks.sol";
 import {BalanceDelta, BalanceDeltaLibrary} from "v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
@@ -18,12 +17,12 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
     uint256 private constant GAS_REBATE_MULTIPLIER_BPS = 20_000; // gas rebate = 200% of gas consumed in a symbiont call
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
-    mapping(Receptor => ISymbiontHooks[]) private s_receptorSymbionts; // list of symbionts attached to a receptor
-    mapping(ISymbiontHooks => uint256) private s_symbiontBalances; // gas balance of a symbiont
+    mapping(Receptor => IHooks[]) private s_receptorSymbionts; // list of symbionts attached to a receptor
+    mapping(IHooks => uint256) private s_symbiontBalances; // gas balance of a symbiont
 
-    constructor(IPoolManager poolManager)
+    constructor(IPoolManager _poolManager)
         BaseHostHook(
-            poolManager,
+            _poolManager,
             Hooks.Permissions(false, false, true, true, true, true, false, true, false, true, false, false, false, false)
         )
     {}
@@ -31,20 +30,25 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
     /// @inheritdoc IHostHooks
     function attach(PoolKey calldata key, bytes4[] calldata selectors) external {
         for (uint256 i = 0; i < selectors.length; i++) {
-            s_receptorSymbionts[ReceptorLibrary.from(key, selectors[i])].push(ISymbiontHooks(msg.sender));
+            s_receptorSymbionts[ReceptorLibrary.from(key, selectors[i])].push(IHooks(msg.sender));
         }
     }
 
     /// @inheritdoc IHostHooks
     function detach(PoolKey calldata key, bytes4[] calldata selectors) external {
         for (uint256 i = 0; i < selectors.length; i++) {
-            _detach(ReceptorLibrary.from(key, selectors[i]), ISymbiontHooks(msg.sender));
+            _detach(ReceptorLibrary.from(key, selectors[i]), IHooks(msg.sender));
         }
     }
 
     /// @inheritdoc IHostHooks
     function refill() external payable {
-        s_symbiontBalances[ISymbiontHooks(msg.sender)] += msg.value;
+        s_symbiontBalances[IHooks(msg.sender)] += msg.value;
+    }
+
+    /// @inheritdoc IHostHooks
+    function poolManager() external view override returns (IPoolManager) {
+        return s_poolManager;
     }
 
     /// @inheritdoc IHooks
@@ -153,8 +157,8 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
     }
 
     /// @notice Helper function to detach a symbiont from a receptor
-    function _detach(Receptor receptor, ISymbiontHooks symbiont) private {
-        ISymbiontHooks[] storage s_symbionts = s_receptorSymbionts[receptor];
+    function _detach(Receptor receptor, IHooks symbiont) private {
+        IHooks[] storage s_symbionts = s_receptorSymbionts[receptor];
 
         for (uint256 i = 0; i < s_symbionts.length; i++) {
             if (s_symbionts[i] == symbiont) {
@@ -166,7 +170,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
     }
 
     /// @notice Helper function for calling a symbiont, check for success but do not revert
-    function _callSymbiont(ISymbiontHooks symbiont, bytes memory data, uint256 gasLimit)
+    function _callSymbiont(IHooks symbiont, bytes memory data, uint256 gasLimit)
         private
         returns (bool success, bytes memory result)
     {
@@ -190,7 +194,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
     /// @notice Helper function to call symbionts attached to a receptor, and give gas rebate to recipient
     function _callSymbiontsAndGiveGasRebate(Receptor receptor, bytes memory data, address recipient) private {
         uint256 gasLimit = (block.gaslimit * GAS_LIMIT_BPS) / BPS_DENOMINATOR; // gas allowed per symbiont call, 1% of block gas limit
-        ISymbiontHooks[] storage s_symbionts = s_receptorSymbionts[receptor];
+        IHooks[] storage s_symbionts = s_receptorSymbionts[receptor];
 
         uint256 totalGasRebate;
         for (uint256 i = 0; i < s_symbionts.length;) {
@@ -198,7 +202,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
             uint256 gasBefore = gasleft();
             if (gasBefore < gasLimit) break; // stop if not enough gas left
 
-            ISymbiontHooks symbiont = s_symbionts[i];
+            IHooks symbiont = s_symbionts[i];
             uint256 balance = s_symbiontBalances[symbiont];
             if (balance < gasLimit) {
                 _detach(receptor, symbiont); // detach symbiont if not enough balance, do not increment i

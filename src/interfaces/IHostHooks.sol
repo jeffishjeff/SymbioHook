@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 
 /// @notice Interface for HostHooks
@@ -13,4 +14,7 @@ interface IHostHooks {
 
     /// @notice Refills the gas balance of the symbiont
     function refill() external payable;
+
+    /// @notice Returns the pool manager
+    function poolManager() external view returns (IPoolManager);
 }
