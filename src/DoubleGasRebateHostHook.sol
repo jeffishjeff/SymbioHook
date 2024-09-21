@@ -189,15 +189,15 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
             success := and(success, gt(returndatasize(), 31))
 
             // continue if call succeeds with return data
-            // if success {
-            //     result := mload(0x40)
-            //     mstore(0x40, add(result, and(add(returndatasize(), 0x3f), not(0x1f))))
-            //     mstore(result, returndatasize())
-            //     returndatacopy(add(result, 0x20), 0, returndatasize())
+            if success {
+                result := mload(0x40)
+                mstore(0x40, add(result, and(add(returndatasize(), 0x3f), not(0x1f))))
+                mstore(result, returndatasize())
+                returndatacopy(add(result, 0x20), 0, returndatasize())
 
-            //     // ensure the correct selector is returned
-            //     success := and(success, eq(mload(add(data, 0x20)), mload(add(result, 0x20))))
-            // }
+                // ensure the correct selector is returned
+                // success := and(success, eq(mload(add(data, 0x20)), mload(add(result, 0x20))))
+            }
         }
     }
 
@@ -207,8 +207,8 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         IHooks[] storage s_symbionts = s_receptorSymbionts[receptor];
 
         uint256 totalGasRebate;
+        // sload length each time as the array may change
         for (uint256 i = 0; i < s_symbionts.length;) {
-            // sload length each time as the array may change
             uint256 gasBefore = gasleft();
             if (gasBefore < gasLimit) break; // stop if not enough gas left
 
@@ -233,6 +233,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
             }
         }
 
+        // credit recipient with claim, could just send directly but has potential security implications
         if (totalGasRebate > 0) {
             s_poolManager.mint(recipient, 0, totalGasRebate);
             s_poolManager.sync(CurrencyLibrary.ADDRESS_ZERO);

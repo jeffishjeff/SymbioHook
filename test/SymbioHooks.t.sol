@@ -120,6 +120,29 @@ contract SymbioHooks is Test, Deployers {
         assertEq(symbionts.length, 0);
     }
 
+    function test_duplicatedAttachLeadsToDuplicatedCalls() public {
+        _attach();
+        symbiontHook.refill{value: 1 ether}();
+
+        address symbiontHookAddress = address(uint160(Hooks.AFTER_SWAP_FLAG) | 1 << 150);
+        deployCodeTo("DampenedOracleSymbiontHook.sol", abi.encode(hostHook), symbiontHookAddress);
+        DampenedOracleSymbiontHook symbiontHook2 = DampenedOracleSymbiontHook(symbiontHookAddress);
+
+        PoolKey[] memory keys = new PoolKey[](1);
+        keys[0] = key;
+        symbiontHook2.attach(keys);
+        symbiontHook2.attach(keys); // attached twice
+
+        symbiontHook.refill{value: 1 ether}();
+
+        // swap
+        swapRouter.swap(
+            key, SWAP_PARAMS, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), ZERO_BYTES
+        );
+
+        assertGt(hostHook.balanceOf(symbiontHook), hostHook.balanceOf(symbiontHook2));
+    }
+
     function _attach() private {
         PoolKey[] memory keys = new PoolKey[](1);
         keys[0] = key;
