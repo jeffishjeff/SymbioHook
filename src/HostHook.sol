@@ -3,27 +3,35 @@ pragma solidity =0.8.27;
 
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
 import {CurrencyLibrary} from "v4-core/types/Currency.sol";
-import {IHostHooks, IHooks} from "./interfaces/IHostHooks.sol";
+import {IHooks} from "v4-core/interfaces/IHooks.sol";
+import {IHostHooks} from "./interfaces/IHostHooks.sol";
 import {ISymbiontHooks} from "./interfaces/ISymbiontHooks.sol";
 import {BalanceDelta, BalanceDeltaLibrary} from "v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Receptor, ReceptorLibrary} from "./types/Receptor.sol";
+import {BaseHook} from "./BaseHook.sol";
 
-contract HostHooks is IHostHooks {
-    error HookNotImplemented();
-
+contract HostHook is IHostHooks, BaseHook {
     uint256 private constant GAS_LIMIT_BPS = 100; // gas limit per symbiont call, 1% of block gas limit
     uint256 private constant GAS_REBATE_MULTIPLIER_BPS = 15_000; // gas rebate = 150% of gas consumed in a symbiont call
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
-    IPoolManager private immutable s_poolManager;
     mapping(Receptor => ISymbiontHooks[]) private s_receptorSymbionts; // list of symbionts attached to a receptor
     mapping(ISymbiontHooks => uint256) private s_symbiontBalances; // gas balance of a symbiont
 
-    constructor(IPoolManager poolManager) {
-        s_poolManager = poolManager;
-    }
+    constructor(IPoolManager poolManager) BaseHook(poolManager, true) {}
+
+    // function getHookPermissions() public pure virtual returns (Hooks.Permissions memory) {}
+    //     return IPoolManager.HookPermissions({
+    //         beforeAddLiquidity: IPoolManager.HookPermission.REQUIRED,
+    //         afterAddLiquidity: IPoolManager.HookPermission.REQUIRED,
+    //         beforeRemoveLiquidity: IPoolManager.HookPermission.REQUIRED,
+    //         afterRemoveLiquidity: IPoolManager.HookPermission.REQUIRED,
+    //         afterSwap: IPoolManager.HookPermission.REQUIRED,
+    //         afterDonate: IPoolManager.HookPermission.REQUIRED
+    //     });
+    // }
 
     /// @inheritdoc IHostHooks
     function attach(PoolKey calldata key, bytes4[] calldata selectors) external {
@@ -50,7 +58,7 @@ contract HostHooks is IHostHooks {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external virtual returns (bytes4) {
+    ) external override(IHooks, BaseHook) returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.beforeAddLiquidity.selector),
             abi.encodeCall(IHooks.beforeAddLiquidity, (sender, key, params, hookData)),
@@ -68,7 +76,7 @@ contract HostHooks is IHostHooks {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external virtual returns (bytes4, BalanceDelta) {
+    ) external override(IHooks, BaseHook) returns (bytes4, BalanceDelta) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterAddLiquidity.selector),
             abi.encodeCall(IHooks.afterAddLiquidity, (sender, key, params, delta, feesAccrued, hookData)),
@@ -85,7 +93,7 @@ contract HostHooks is IHostHooks {
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         bytes calldata hookData
-    ) external virtual returns (bytes4) {
+    ) external override(IHooks, BaseHook) returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.beforeRemoveLiquidity.selector),
             abi.encodeCall(IHooks.beforeRemoveLiquidity, (sender, key, params, hookData)),
@@ -103,7 +111,7 @@ contract HostHooks is IHostHooks {
         BalanceDelta delta,
         BalanceDelta feesAccrued,
         bytes calldata hookData
-    ) external virtual returns (bytes4, BalanceDelta) {
+    ) external override(IHooks, BaseHook) returns (bytes4, BalanceDelta) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterRemoveLiquidity.selector),
             abi.encodeCall(IHooks.afterRemoveLiquidity, (sender, key, params, delta, feesAccrued, hookData)),
@@ -121,7 +129,7 @@ contract HostHooks is IHostHooks {
         IPoolManager.SwapParams calldata params,
         BalanceDelta delta,
         bytes calldata hookData
-    ) external virtual returns (bytes4, int128) {
+    ) external override(IHooks, BaseHook) returns (bytes4, int128) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterSwap.selector),
             abi.encodeCall(IHooks.afterSwap, (sender, key, params, delta, hookData)),
@@ -139,7 +147,7 @@ contract HostHooks is IHostHooks {
         uint256 amount0,
         uint256 amount1,
         bytes calldata hookData
-    ) external virtual returns (bytes4) {
+    ) external override(IHooks, BaseHook) returns (bytes4) {
         _callSymbiontsAndGiveGasRebate(
             ReceptorLibrary.from(key, this.afterDonate.selector),
             abi.encodeCall(IHooks.afterDonate, (sender, key, amount0, amount1, hookData)),
@@ -220,37 +228,5 @@ contract HostHooks is IHostHooks {
             s_poolManager.sync(CurrencyLibrary.ADDRESS_ZERO);
             s_poolManager.settleFor{value: totalGasRebate}(recipient);
         }
-    }
-
-    /// @inheritdoc IHooks
-    function beforeInitialize(address, PoolKey calldata, uint160, bytes calldata) external virtual returns (bytes4) {
-        revert HookNotImplemented();
-    }
-
-    /// @inheritdoc IHooks
-    function afterInitialize(address, PoolKey calldata, uint160, int24, bytes calldata)
-        external
-        virtual
-        returns (bytes4)
-    {
-        revert HookNotImplemented();
-    }
-
-    /// @inheritdoc IHooks
-    function beforeSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata, bytes calldata)
-        external
-        virtual
-        returns (bytes4, BeforeSwapDelta, uint24)
-    {
-        revert HookNotImplemented();
-    }
-
-    /// @inheritdoc IHooks
-    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
-        external
-        virtual
-        returns (bytes4)
-    {
-        revert HookNotImplemented();
     }
 }
