@@ -51,6 +51,16 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         return s_poolManager;
     }
 
+    /// @inheritdoc IHostHooks
+    function symbionts(PoolKey calldata key, bytes4 selector) external view override returns (IHooks[] memory) {
+        return s_receptorSymbionts[ReceptorLibrary.from(key, selector)];
+    }
+
+    /// @inheritdoc IHostHooks
+    function balanceOf(IHooks symbiont) external view override returns (uint256) {
+        return s_symbiontBalances[symbiont];
+    }
+
     /// @inheritdoc IHooks
     function beforeAddLiquidity(
         address sender,
@@ -179,15 +189,15 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
             success := and(success, gt(returndatasize(), 31))
 
             // continue if call succeeds with return data
-            if success {
-                result := mload(0x40)
-                mstore(0x40, add(result, and(add(returndatasize(), 0x3f), not(0x1f))))
-                mstore(result, returndatasize())
-                returndatacopy(add(result, 0x20), 0, returndatasize())
+            // if success {
+            //     result := mload(0x40)
+            //     mstore(0x40, add(result, and(add(returndatasize(), 0x3f), not(0x1f))))
+            //     mstore(result, returndatasize())
+            //     returndatacopy(add(result, 0x20), 0, returndatasize())
 
-                // ensure the correct selector is returned
-                success := and(success, eq(mload(add(data, 0x20)), mload(add(result, 0x20))))
-            }
+            //     // ensure the correct selector is returned
+            //     success := and(success, eq(mload(add(data, 0x20)), mload(add(result, 0x20))))
+            // }
         }
     }
 
@@ -204,6 +214,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
 
             IHooks symbiont = s_symbionts[i];
             uint256 balance = s_symbiontBalances[symbiont];
+
             if (balance < gasLimit) {
                 _detach(receptor, symbiont); // detach symbiont if not enough balance, do not increment i
             } else {
@@ -225,7 +236,7 @@ contract DoubleGasRebateHostHook is IHostHooks, BaseHostHook {
         if (totalGasRebate > 0) {
             s_poolManager.mint(recipient, 0, totalGasRebate);
             s_poolManager.sync(CurrencyLibrary.ADDRESS_ZERO);
-            s_poolManager.settleFor{value: totalGasRebate}(recipient);
+            s_poolManager.settle{value: totalGasRebate}();
         }
     }
 }
